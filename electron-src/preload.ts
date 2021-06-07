@@ -1,15 +1,30 @@
-import { ipcRenderer, IpcRenderer } from 'electron';
+import { ipcRenderer, contextBridge } from 'electron';
 
-declare global {
-  namespace NodeJS {
-    interface Global {
-      ipcRenderer: IpcRenderer;
+export type IPCChannels = 'toMain' | 'fromMain';
+
+// Expose protected methods that allow the renderer process to use
+// the ipcRenderer without exposing the entire object
+contextBridge.exposeInMainWorld('api', {
+  send: (channel: IPCChannels, data: unknown) => {
+    const validChannels = ['toMain'];
+
+    if (validChannels.includes(channel)) {
+      ipcRenderer.send(channel, data);
     }
-  }
-}
+  },
+  receive: (channel: IPCChannels, func: (...args: any[]) => void) => {
+    const validChannels = ['fromMain'];
 
-// Since we disabled nodeIntegration we can reintroduce
-// needed node functionality here
-process.once('loaded', () => {
-  global.ipcRenderer = ipcRenderer;
+    if (validChannels.includes(channel)) {
+      // Deliberately strip event as it includes `sender`
+      ipcRenderer.on(channel, (_event, ...args) => func(...args));
+    }
+  },
+  disconnect: (channel: IPCChannels) => {
+    const validChannels = ['fromMain'];
+
+    if (validChannels.includes(channel)) {
+      ipcRenderer.removeAllListeners(channel);
+    }
+  },
 });

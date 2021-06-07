@@ -1,22 +1,23 @@
-// Native
 import { join } from 'path';
 import { pathToFileURL } from 'url';
-
-// Packages
 import { BrowserWindow, app, ipcMain, IpcMainEvent } from 'electron';
 import isDev from 'electron-is-dev';
 import prepareNext from 'electron-next';
 
-// Prepare the renderer once the app is ready
-app.on('ready', async () => {
+// Keep a global reference of the window object, if you don't, the window will
+// be closed automatically when the JavaScript object is garbage collected.
+let win: BrowserWindow;
+
+const createWindow = async () => {
   await prepareNext('./renderer');
 
-  const mainWindow = new BrowserWindow({
+  win = new BrowserWindow({
     width: 1440,
     height: 768,
     webPreferences: {
-      nodeIntegration: false,
-      preload: join(__dirname, 'preload.js'),
+      contextIsolation: true, // protect against prototype pollution
+      enableRemoteModule: false, // turn off remote
+      preload: join(app.getAppPath(), 'main', 'preload.js'),
     },
   });
 
@@ -24,14 +25,17 @@ app.on('ready', async () => {
     ? 'http://localhost:8000/'
     : pathToFileURL(join(__dirname, '../renderer/out/index.html')).href;
 
-  mainWindow.loadURL(url);
-});
+  win.loadURL(url);
+};
+
+// Prepare the renderer once the app is ready
+app.on('ready', createWindow);
 
 // Quit the app once all windows are closed
 app.on('window-all-closed', app.quit);
 
 // listen the channel `message` and resend the received message to the renderer process
-ipcMain.on('message', (event: IpcMainEvent, message: any) => {
-  console.log(message);
-  setTimeout(() => event.sender.send('message', 'hi from electron'), 500);
+ipcMain.on('toMain', (_event: IpcMainEvent, message: any[]) => {
+  console.log({ message });
+  setTimeout(() => win.webContents.send('fromMain', 'hi from electron'), 500);
 });

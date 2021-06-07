@@ -1,8 +1,13 @@
-import { IpcRenderer } from 'electron';
+import * as electron from 'electron';
+import { IPCChannels } from '../interfaces';
 declare global {
   namespace NodeJS {
     interface Global {
-      ipcRenderer: IpcRenderer;
+      api: {
+        send: (channel: IPCChannels, data: any) => void;
+        receive: (channel: IPCChannels, func: (...args: any[]) => void) => void;
+        disconnect: (channel: IPCChannels) => void;
+      };
     }
   }
 }
